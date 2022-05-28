@@ -489,11 +489,10 @@ void uartprotocol(){
 			case 5:
 				if(RxBuffer[PosdataPre]==126){
 					valueuart=(int32_t)tempuart;
-					valueuart=(valueuart*10000)/127;
+					valueuart=(valueuart*500)/127;
 //					htim1.Instance->CCR1=(valueuart*10000)/255;
 					Drivemotor(valueuart);
 					stateuart=0;
-
 				}else{
 					stateuart=0;
 				}
@@ -534,25 +533,19 @@ uint32_t aaabs(int x){
 
 
 void Drivemotor(int PWM){
-	if(PWM<=0 && PWM>=-10000){
+	if(PWM<=0 && PWM>=-500){
 		htim1.Instance->CCR1=aaabs(PWM);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,1);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9,0);
-	}else if (PWM<-10000){
-		htim1.Instance->CCR1=10000;
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,1);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9,0);
-	}else if(PWM>=0 && PWM<=10000){
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9,0);
+	}else if (PWM<-500){
+		htim1.Instance->CCR1=500;
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9,0);
+	}else if(PWM>=0 && PWM<=500){
 		htim1.Instance->CCR1=aaabs(PWM);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,0);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9,1);
-	}else if(PWM>10000){
-		htim1.Instance->CCR1=10000;
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,0);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9,1);
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9,1);
+	}else if(PWM>500){
+		htim1.Instance->CCR1=500;
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9,1);
 	}
-
-
 }
 /* USER CODE END 4 */
 
