@@ -51,7 +51,7 @@ DMA_HandleTypeDef hdma_usart2_rx;
 int8_t RxBuffer[64]={0};
 uint8_t data[7]={73,109,64,99,0,0,126};
 
-float iniAngle = 0;
+//float iniAngle = 0;
 float finAngle = 360.0;
 float veloMax = (2*math.pi*10)/60;
 float accelMax = 0.5;
@@ -59,6 +59,9 @@ float jerkMax = 0.4;
 float destAngle;
 float timePeriod[7] = {0};
 float b[7], c[7], d[7];
+float posOut, veloOut, accelOut, jerkOut;
+float timeElapsed;
+float samplingTime = 0.001;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -559,7 +562,7 @@ void Drivemotor(int PWM){
 	}
 }
 
-void trajectoryGen(float toAngle){
+void trajectoryGen(){
 	totalTime = (accelMax/jerkMax) + (veloMax/accelMax) + (finAngle/veloMax);
 	timePeriod[0] = accelMax/jerkMax;
 	timePeriod[1] = (veloMax/accelMax);
@@ -592,13 +595,62 @@ void trajectoryGen(float toAngle){
 	d[4] = ((0*timePeriod[3]^3)/6 + (b[3]*timePeriod[3]^2)/2 + c[3]*timePeriod[3] + d[3]) - ((-jerkMax*timePeriod[3]^3)/6 + (b[4]*timePeriod[3]^2)/2 + c[4]*timePeriod[3]);
 	d[5] = ((-jerkMax*timePeriod[4]^3)/6 + (b[4]*timePeriod[4]^2)/2 + c[4]*timePeriod[4] + d[4]) - ((0*timePeriod[4]^3)/6 + (b[5]*timePeriod[4]^2)/2 + c[5]*timePeriod[4]);
 	d[6] = ((0*timePeriod[5]^3)/6 + (b[5]*timePeriod[5]^2)/2 + c[5]*timePeriod[5] + d[5]) - ((jerkMax*timePeriod[5]^3)/6 + (b[6]*timePeriod[5]^2)/2 + c[6]*timePeriod[5]);
+
+//	iniAngle = (iniAngle + toAngle) % 360;
 }
 
 void trajectoryEval(){
-	iniAngle = (iniAngle + toAngle) % 360;
+	if (timeElapsed >= 0 && timeElapsed < timePeriod[0]){
+		accelOut = jerkMax*timeElapsed + b[0];
+	    jerkOut = jerkMax;
+	    veloOut = jerkMax*timeElapsed^2/2 + b[0]*timeElapsed + c[0];
+	    posOut = jerkMax*timeElapsed^3/6 + b[0]*timeElapsed^2/2 + c[0]*timeElapsed + d[0];
+	}
+
+	else if (timeElapsed >= timePeriod[0] && timeElapsed < timePeriod[1]){
+		accelOut = 0*timeElapsed + b[1];
+	    jerkOut = 0;
+	    veloOut = 0*timeElapsed^2/2 + b[1]*timeElapsed + c[1];
+	    posOut = 0*timeElapsed^3/6 + b[1]*timeElapsed^2/2 + c[1]*timeElapsed + d[1];
+	}
+
+	else if (timeElapsed >= timePeriod[1] && timeElapsed < timePeriod[2]){
+		accelOut = -jerkMax*timeElapsed + b[2];
+	    jerkOut = -jerkMax;
+	    veloOut = -jerkMax*timeElapsed^2/2 + b[2]*timeElapsed + c[2];
+	    posOut = -jerkMax*timeElapsed^3/6 + b[2]*timeElapsed^2/2 + c[2]*timeElapsed + d[2];
+	}
+
+	else if (timeElapsed >= timePeriod[2] && timeElapsed < timePeriod[3]){
+		accelOut = 0*timeElapsed + b[3];
+	    jerkOut = 0;
+	    veloOut = 0*timeElapsed^2/2 + b[3]*timeElapsed + c[3];
+	    posOut = 0*timeElapsed^3/6 + b[3]*timeElapsed^2/2 + c[3]*timeElapsed + d[3];
+	}
+
+	else if (timeElapsed >= timePeriod[3] && timeElapsed < timePeriod[4]){
+		accelOut = -jerkMax*timeElapsed + b[4];
+	    jerkOut = -jerkMax;
+	    veloOut = -jerkMax*timeElapsed^2/2 + b[4]*timeElapsed + c[4];
+	    posOut = -jerkMax*timeElapsed^3/6 + b[4]*timeElapsed^2/2 + c[4]*timeElapsed + d[4];
+	}
+
+	else if (timeElapsed >= timePeriod[4] && timeElapsed < timePeriod[5]){
+		accelOut = 0*timeElapsed + b[5];
+	    jerkOut = 0;
+	    veloOut = 0*timeElapsed^2/2 + b[5]*timeElapsed + c[5];
+	    posOut = 0*timeElapsed^3/6 + b[5]*timeElapsed^2/2 + c[5]*timeElapsed + d[5];
+	}
+
+	else{
+		accelOut = jerkMax*timeElapsed + b[6];
+	    jerkOut = jerkMax;
+	    veloOut = jerkMax*timeElapsed^2/2 + b[6]*timeElapsed + c[6];
+	    posOut = jerkMax*timeElapsed^3/6 + b[6]*timeElapsed^2/2 + c[6]*timeElapsed + d[6];
+	}
 }
 
-void PID(){
+void PIDController(){
 
 }
 /* USER CODE END 4 */
