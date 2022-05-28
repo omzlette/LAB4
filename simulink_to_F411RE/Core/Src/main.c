@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,11 +49,16 @@ DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 int8_t RxBuffer[64]={0};
-
 uint8_t data[7]={73,109,64,99,0,0,126};
 
-void uartprotocol();
-void Drivemotor(int PWM);
+float iniAngle = 0;
+float finAngle = 360.0;
+float veloMax = (2*math.pi*10)/60;
+float accelMax = 0.5;
+float jerkMax = 0.4;
+float destAngle;
+float timePeriod[7] = {0};
+float b[7], c[7], d[7];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -65,7 +70,11 @@ static void MX_TIM1_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-
+//void uartprotocol();
+void Drivemotor(int PWM);
+void trajectoryGen(float toAngle);
+void trajectoryEval();
+void PID();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -122,6 +131,8 @@ int main(void)
   while (1)
   {
 	  uartprotocol();
+
+	  trajectoryGen(destAngle);
 
     /* USER CODE END WHILE */
 
@@ -443,72 +454,72 @@ uint8_t PosdataPre=0;
 
 int32_t valueuart=0;
 uint8_t stateuart=0;
-void uartprotocol(){
-	static int8_t tempuart=0;
-	Posdata=huart2.RxXferSize-huart2.hdmarx->Instance->NDTR;
-	if(Posdata!=PosdataPre ){
-
-
-		switch(stateuart){
-			case 0:
-				if(RxBuffer[PosdataPre]==73){
-					stateuart=1;
-
-				}else{
-					stateuart=0;
-				}
-			break;
-			case 1:
-				if(RxBuffer[PosdataPre]==109){
-					stateuart=2;
-
-				}else{
-					stateuart=0;
-				}
-			break;
-			case 2:
-				if(RxBuffer[PosdataPre]==64){
-					stateuart=3;
-
-				}else{
-					stateuart=0;
-				}
-			break;
-			case 3:
-				if(RxBuffer[PosdataPre]==99){
-					stateuart=4;
-
-				}else{
-					stateuart=0;
-				}
-			break;
-			case 4:
-				tempuart=RxBuffer[PosdataPre];
-				stateuart=5;
-			break;
-			case 5:
-				if(RxBuffer[PosdataPre]==126){
-					valueuart=(int32_t)tempuart;
-					valueuart=(valueuart*500)/127;
-//					htim1.Instance->CCR1=(valueuart*10000)/255;
-					Drivemotor(valueuart);
-					stateuart=0;
-				}else{
-					stateuart=0;
-				}
-			break;
-
-		}
-
-
-
-
-		PosdataPre=(PosdataPre+1)%64;
-	}
-
-
-
-}
+//void uartprotocol(){
+//	static int8_t tempuart=0;
+//	Posdata=huart2.RxXferSize-huart2.hdmarx->Instance->NDTR;
+//	if(Posdata!=PosdataPre ){
+//
+//
+//		switch(stateuart){
+//			case 0:
+//				if(RxBuffer[PosdataPre]==73){
+//					stateuart=1;
+//
+//				}else{
+//					stateuart=0;
+//				}
+//			break;
+//			case 1:
+//				if(RxBuffer[PosdataPre]==109){
+//					stateuart=2;
+//
+//				}else{
+//					stateuart=0;
+//				}
+//			break;
+//			case 2:
+//				if(RxBuffer[PosdataPre]==64){
+//					stateuart=3;
+//
+//				}else{
+//					stateuart=0;
+//				}
+//			break;
+//			case 3:
+//				if(RxBuffer[PosdataPre]==99){
+//					stateuart=4;
+//
+//				}else{
+//					stateuart=0;
+//				}
+//			break;
+//			case 4:
+//				tempuart=RxBuffer[PosdataPre];
+//				stateuart=5;
+//			break;
+//			case 5:
+//				if(RxBuffer[PosdataPre]==126){
+//					valueuart=(int32_t)tempuart;
+//					valueuart=(valueuart*500)/127;
+////					htim1.Instance->CCR1=(valueuart*10000)/255;
+//					Drivemotor(valueuart);
+//					stateuart=0;
+//				}else{
+//					stateuart=0;
+//				}
+//			break;
+//
+//		}
+//
+//
+//
+//
+//		PosdataPre=(PosdataPre+1)%64;
+//	}
+//
+//
+//
+//}
 
 uint16_t value=0;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
@@ -546,6 +557,49 @@ void Drivemotor(int PWM){
 		htim1.Instance->CCR1=500;
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9,1);
 	}
+}
+
+void trajectoryGen(float toAngle){
+	totalTime = (accelMax/jerkMax) + (veloMax/accelMax) + (finAngle/veloMax);
+	timePeriod[0] = accelMax/jerkMax;
+	timePeriod[1] = (veloMax/accelMax);
+	timePeriod[2] = (accelMax/jerkMax) + (veloMax/accelMax);
+	timePeriod[3] = totalTime - timePeriod[2];
+	timePeriod[4] = totalTime - timePeriod[1];
+	timePeriod[5] = totalTime - timePeriod[0];
+	timePeriod[6] = totalTime;
+
+	b[0] = 0;
+	b[1] = accelMax;
+	b[2] = accelMax + (jerkMax*timePeriod[1]);
+	b[3] = 0;
+	b[4] = jerkMax*timePeriod[3];
+	b[5] = -accelMax;
+	b[6] = -accelMax - (jerkMax*timePeriod[5]);
+
+	c[0] = 0;
+	c[1] = ((jerkMax*timePeriod[0]^2)/2 + b[0]*timePeriod[0] + c[0]) - ((0*timePeriod[0]^2)/2 + b[1]*timePeriod[0]);
+	c[2] = ((0*timePeriod[1]^2)/2 + b[1]*timePeriod[1] + c[1]) - ((-jerkMax*timePeriod[1]^2)/2 + b[2]*timePeriod[1]);
+	c[3] = ((-jerkMax*timePeriod[2]^2)/2 + b[2]*timePeriod[2] + c[2]) - ((0*timePeriod[2]^2)/2 + b[3]*timePeriod[2]);
+	c[4] = ((0*timePeriod[3]^2)/2 + b[3]*timePeriod[3] + c[3]) - ((-jerkMax*timePeriod[3]^2)/2 + b[4]*timePeriod[3]);
+	c[5] = ((-jerkMax*timePeriod[4]^2)/2 + b[4]*timePeriod[4] + c[4]) - ((0*timePeriod[4]^2)/2 + b[5]*timePeriod[4]);
+	c[6] = ((0*timePeriod[5]^2)/2 + b[5]*timePeriod[5] + c[5]) - ((jerkMax*timePeriod[5]^2)/2 + b[6]*timePeriod[5]);
+
+	d[0] = 0;
+	d[1] = ((jerkMax*timePeriod[0]^3)/6 + (b[0]*timePeriod[0]^2)/2 + c[0]*timePeriod[0] + d[0]) - ((0*timePeriod[0]^3)/6 + (b[1]*timePeriod[0]^2)/2 + c[1]*timePeriod[0]);
+	d[2] = ((0*timePeriod[1]^3)/6 + (b[1]*timePeriod[1]^2)/2 + c[1]*timePeriod[1] + d[1]) - ((-jerkMax*timePeriod[1]^3)/6 + (b[2]*timePeriod[1]^2)/2 + c[2]*timePeriod[1]);
+	d[3] = ((-jerkMax*timePeriod[2]^3)/6 + (b[2]*timePeriod[2]^2)/2 + c[2]*timePeriod[2] + d[2]) - ((0*timePeriod[2]^3)/6 + (b[3]*timePeriod[2]^2)/2 + c[3]*timePeriod[2]);
+	d[4] = ((0*timePeriod[3]^3)/6 + (b[3]*timePeriod[3]^2)/2 + c[3]*timePeriod[3] + d[3]) - ((-jerkMax*timePeriod[3]^3)/6 + (b[4]*timePeriod[3]^2)/2 + c[4]*timePeriod[3]);
+	d[5] = ((-jerkMax*timePeriod[4]^3)/6 + (b[4]*timePeriod[4]^2)/2 + c[4]*timePeriod[4] + d[4]) - ((0*timePeriod[4]^3)/6 + (b[5]*timePeriod[4]^2)/2 + c[5]*timePeriod[4]);
+	d[6] = ((0*timePeriod[5]^3)/6 + (b[5]*timePeriod[5]^2)/2 + c[5]*timePeriod[5] + d[5]) - ((jerkMax*timePeriod[5]^3)/6 + (b[6]*timePeriod[5]^2)/2 + c[6]*timePeriod[5]);
+}
+
+void trajectoryEval(){
+	iniAngle = (iniAngle + toAngle) % 360;
+}
+
+void PID(){
+
 }
 /* USER CODE END 4 */
 
